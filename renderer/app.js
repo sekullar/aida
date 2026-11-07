@@ -75,7 +75,8 @@ function renderCenter() {
   const ready = invited.filter((s) => s.conn === 'ready' && s.status !== 'limit' && s.status !== 'error').length;
   const blocked = invited.filter((s) => s.conn !== 'ready' && s.note);
   let main;
-  if (!S.running && blocked.length) main = blocked.map((s) => `<div class="tc-hint"><b>${esc(s.name)}:</b> ${esc(s.note)}</div>`).join('');
+  if (extOutdated()) main = `<div class="tc-warn">Chrome'daki AIDA Bridge uzantısı güncel değil (${esc(extVerText())}, gereken v${esc(S.expectedExt)}). Ayarlar'daki adımlarla yenile.</div>`;
+  else if (!S.running && blocked.length) main = blocked.map((s) => `<div class="tc-hint"><b>${esc(s.name)}:</b> ${esc(s.note)}</div>`).join('');
   else if (S.running && S.phase) main = `<span class="dots">${esc(S.phase)}</span>`;
   else if (S.running) main = '<span class="dots">Masa çalışıyor</span>';
   else if (!ready) main = '<span class="tc-hint">Katılımcıların hazır olmasını bekliyor…</span>';
@@ -108,9 +109,20 @@ function renderFeed() {
   if (nearBottom) feed.scrollTop = feed.scrollHeight;
 }
 
+// Bağlı uzantı, uygulamayla gelen sürümden farklıysa (eski kopya yüklü / yenilenmemiş)
+const extOutdated = () => !!(S.extension && S.expectedExt && S.extVersion !== S.expectedExt);
+const extVerText = () => (S.extVersion && S.extVersion !== '0' ? 'v' + S.extVersion : 'eski sürüm');
+
 function renderControls() {
-  $('extChip').textContent = S.extension ? 'Uzantı bağlı' : 'Uzantı bağlı değil';
-  $('extChip').className = 'ext-chip ' + (S.extension ? 'on' : 'off');
+  const old = extOutdated();
+  $('extChip').textContent = !S.extension ? 'Uzantı bağlı değil' : old ? 'Uzantı güncel değil' : 'Uzantı bağlı';
+  $('extChip').className = 'ext-chip ' + (!S.extension ? 'off' : old ? 'old' : 'on');
+  $('extChip').title = old ? `Chrome'daki AIDA Bridge ${extVerText()}, bu sürümle gelen v${S.expectedExt}. Ayarlar'daki adımlarla yenile.` : '';
+  $('updChip').hidden = !S.update;
+  if (S.update) {
+    $('updChip').textContent = `Yeni sürüm: v${S.update.latest}`;
+    $('updChip').title = "Sentinel Hub'dan güncelle ya da GitHub'dan indir";
+  }
   $('auto').checked = S.auto;
   $('btnStop').hidden = !S.running && !S.auto;
   $('roundInfo').textContent = S.round ? `${S.round}. tur` : '';
@@ -138,11 +150,20 @@ function renderSettings() {
     list.appendChild(row);
   }
   const box = $('extBox');
-  if (S.extension) box.innerHTML = '<span style="color:var(--ok)">Uzantı bağlı.</span> Davet ettiğin yapay zekalar Chrome\'da yeni sohbet olarak açılır. Giriş yapılmamışsa sekmede giriş yapman yeterli.';
+  $('verInfo').textContent = `AIDA v${S.appVersion || '?'} · Uzantı ${S.extVersion ? extVerText() : '—'}`;
+  if (extOutdated()) {
+    box.innerHTML = `<p style="color:var(--danger)">Chrome'daki AIDA Bridge ${esc(extVerText())}, bu AIDA sürümüyle gelen <b>v${esc(S.expectedExt)}</b>. Yeni siteler ve düzeltmeler çalışmaz.</p>
+      <ol><li><code>chrome://extensions</code> sayfasında AIDA Bridge'in <b>↻ yenile</b> düğmesine bas.</li>
+      <li>Hâlâ eskiyse uzantıyı <b>Kaldır</b>, sonra <b>Paketlenmemiş öğe yükle</b> ile aşağıdaki klasörü seç.</li>
+      ${S.extCopies > 1 ? '<li>Chrome\'da birden fazla AIDA Bridge yüklü görünüyor; yalnızca bu klasördekini bırak.</li>' : ''}
+      <li>Yapay zeka pencerelerini yenile.</li></ol>
+      <div class="row"><button id="bExt">Uzantı klasörünü aç</button></div>`;
+    $('bExt').onclick = () => window.aida.openExtensionFolder();
+  } else if (S.extension) box.innerHTML = '<span style="color:var(--ok)">Uzantı bağlı.</span> Davet ettiğin yapay zekalar Chrome\'da yeni sohbet olarak açılır. Giriş yapılmamışsa sekmede giriş yapman yeterli.';
   else {
     box.innerHTML = `${S.bridgeError ? `<p style="color:var(--danger)">${esc(S.bridgeError)}</p>` : ''}
       <ol><li>Chrome'da <code>chrome://extensions</code> aç, sağ üstten <b>Geliştirici modu</b>nu aç.</li>
-      <li><b>Paketlenmemiş öğe yükle</b> de ve AIDA'nın <code>extension</code> klasörünü seç.</li>
+      <li><b>Paketlenmemiş öğe yükle</b> de ve aşağıdaki "Uzantı klasörünü aç" düğmesinin açtığı klasörü seç.</li>
       <li>Birkaç saniye içinde yukarıdaki rozet "Uzantı bağlı" olur.</li></ol>
       <div class="row"><button id="bExt">Uzantı klasörünü aç</button><button id="bChrome">Chrome'u başlat</button></div>`;
     $('bExt').onclick = () => window.aida.openExtensionFolder();
@@ -179,6 +200,7 @@ $('btnSave').onclick = async () => {
   $('btnClose').click();
 };
 $('btnSend').onclick = send;
+$('updChip').onclick = () => window.aida.openUpdate();
 $('btnStop').onclick = () => window.aida.stop();
 $('btnNew').onclick = () => { if (confirm('Konuşma silinsin ve AI sekmeleri yeni sohbetle yeniden açılsın mı?')) window.aida.newSession(); };
 $('auto').onchange = (e) => window.aida.setAuto(e.target.checked);

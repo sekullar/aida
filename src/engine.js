@@ -58,6 +58,12 @@ class Engine extends EventEmitter {
     return {
       extension: this.bridge.connected(),
       bridgeError: this.bridge.error || null,
+      // sürüm kontrolü: uygulama, bağlı uzantı ve beklenen (uygulamayla gelen) uzantı sürümü
+      appVersion: this.appVersion || null,
+      extVersion: this.bridge.clientVersion ? this.bridge.clientVersion() : null,
+      expectedExt: this.bridge.expectedExt || null,
+      extCopies: this.bridge.copies ? this.bridge.copies() : 1,
+      update: this.update || null,
       seats: this.seats.map(({ id, name, invited, conn, status, note }) => ({ id, name, invited, conn, status, note })),
       transcript: this.transcript,
       running: this.running,

@@ -10,6 +10,7 @@
 <header>
   <div class="brand"><img class="logo" src="../assets/logo.svg" alt=""><b>AIDA</b><span class="sub">Artificial Intelligence Debate Arena</span></div>
   <div class="head-right">
+    <button id="updChip" class="ext-chip upd" hidden></button>
     <span id="extChip" class="ext-chip off">Uzantı bağlı değil</span>
     <button id="btnNew" class="ghost" title="Tüm sohbetleri sıfırla">Yeni oturum</button>
     <button id="btnSettings" class="icon" title="Ayarlar" aria-label="Ayarlar">
@@ -61,7 +62,7 @@
       <label>Zaman aşımı (sn)<input type="number" id="setTimeout" min="30" max="1800"></label>
       <label>Otopilot tur sınırı (0 = sınırsız)<input type="number" id="setRounds" min="0" max="500"></label>
     </div>
-    <div class="dialog-foot"><button id="btnSave" class="primary">Kaydet</button></div>
+    <div class="dialog-foot"><span id="verInfo" class="ver-info"></span><button id="btnSave" class="primary">Kaydet</button></div>
   </div>
 </div>
 

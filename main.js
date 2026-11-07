@@ -4,8 +4,47 @@ const fs = require('fs');
 const { spawn } = require('child_process');
 const { Bridge } = require('./src/bridge');
 const { Engine } = require('./src/engine');
+const { isNewer } = require('./src/version');
 
 if (!app.requestSingleInstanceLock()) app.quit();
+
+const REPO = 'sekullar/aida';
+
+// Uygulamayla gelen uzantı: geliştirmede proje klasörü, kurulu sürümde resources/extension
+const bundledExt = () => (app.isPackaged ? path.join(process.resourcesPath, 'extension') : path.join(__dirname, 'extension'));
+const extVersionOf = (dir) => { try { return JSON.parse(fs.readFileSync(path.join(dir, 'manifest.json'), 'utf8')).version; } catch { return null; } };
+
+// Kurulu sürümde Chrome'a yüklenecek klasör %APPDATA%\AIDA\extension. Kurulum klasörü güncellemede silinip yeniden
+// yazıldığı için Chrome oradan yüklenirse uzantı kopar; bu sabit kopya her yeni sürümde tazelenir.
+function prepareExtension() {
+  const src = bundledExt();
+  if (!app.isPackaged) return src;
+  const dest = path.join(app.getPath('userData'), 'extension');
+  try {
+    if (extVersionOf(dest) !== extVersionOf(src)) {
+      fs.rmSync(dest, { recursive: true, force: true });
+      fs.cpSync(src, dest, { recursive: true });
+    }
+    return dest;
+  } catch {
+    return src;
+  }
+}
+
+// GitHub'daki son sürüm (Sentinel Hub ile aynı kaynak: Release etiketi)
+async function checkAppUpdate() {
+  try {
+    const res = await fetch(`https://api.github.com/repos/${REPO}/releases/latest`, {
+      headers: { 'User-Agent': 'AIDA', Accept: 'application/vnd.github+json' },
+    });
+    if (!res.ok) return null;
+    const rel = await res.json();
+    if (!rel.tag_name || !isNewer(rel.tag_name, app.getVersion())) return null;
+    return { latest: String(rel.tag_name).replace(/^v/i, ''), url: String(rel.html_url || `https://github.com/${REPO}/releases/latest`) };
+  } catch {
+    return null;
+  }
+}
 
 let win, engine, bridge, pushTimer;
 const settingsFile = () => path.join(app.getPath('userData'), 'settings.json');
@@ -33,10 +72,14 @@ function launchChrome() {
 }
 
 app.whenReady().then(() => {
-  bridge = new Bridge(47821);
+  const extDir = prepareExtension();
+  bridge = new Bridge(47821, { expectedExt: extVersionOf(extDir) });
   engine = new Engine(bridge, loadSettings());
+  engine.appVersion = app.getVersion();
   engine.on('change', push);
-  const logFile = path.join(__dirname, 'debug.log');
+  checkAppUpdate().then((u) => { if (u) { engine.update = u; push(); } });
+  // Geliştirmede proje klasörüne, kurulu sürümde %APPDATA%\AIDA altına
+  const logFile = path.join(app.isPackaged ? app.getPath('userData') : __dirname, 'debug.log');
   try { fs.writeFileSync(logFile, `--- AIDA oturumu ${new Date().toISOString()} ---
 `); } catch {}
   engine.on('log', (line) => { try { fs.appendFileSync(logFile, `[${new Date().toISOString().slice(11, 23)}] ${line}
@@ -79,7 +122,13 @@ app.whenReady().then(() => {
   ipcMain.handle('aida:stop', () => engine.stop());
   ipcMain.handle('aida:newSession', () => engine.newSession());
   ipcMain.handle('aida:settings', (_e, s) => { engine.updateSettings(s); saveSettings(engine.settings); });
-  ipcMain.handle('aida:openExt', () => shell.openPath(path.join(__dirname, 'extension')));
+  ipcMain.handle('aida:openExt', () => shell.openPath(extDir));
+  ipcMain.handle('aida:extPath', () => extDir);
+  ipcMain.handle('aida:openUpdate', () => {
+    const u = engine.update;
+    if (u && /^https:\/\/github\.com\//.test(u.url)) shell.openExternal(u.url);
+  });
+  ipcMain.handle('aida:openLog', () => shell.openPath(logFile));
   ipcMain.handle('aida:launchChrome', () => launchChrome());
 });
 

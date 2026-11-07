@@ -28,7 +28,8 @@ function connect() {
   ws.onopen = async () => {
     clearInterval(pingTimer);
     pingTimer = setInterval(() => send({ type: 'ping' }), 20000);
-    send({ type: 'hello', tabs: await collectTabStates() });
+    // Sürüm: uygulama, kendisiyle gelen uzantı sürümüyle karşılaştırıp eskiyse "yenile" uyarısı gösterir
+    send({ type: 'hello', version: chrome.runtime.getManifest().version, tabs: await collectTabStates() });
   };
   ws.onmessage = (e) => { try { handleCommand(JSON.parse(e.data)); } catch (err) { console.warn(err); } };
   ws.onclose = () => { clearInterval(pingTimer); ws = null; setTimeout(connect, 2000); };

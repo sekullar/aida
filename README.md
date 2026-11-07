@@ -66,25 +66,42 @@ AIDA was developed and tested on Windows 11.
 
 ### Installation
 
+**Installer (recommended):** download `AIDA.Setup.<version>.exe` from the [latest release](../../releases/latest) and run it, or install AIDA from **[Sentinel Hub](https://github.com/sekullar/sentinel-hub)**, which also keeps it up to date. The installer is not code-signed, so Windows SmartScreen may ask you to confirm ("More info" → "Run anyway").
+
+Then load the Chrome extension:
+
+1. In AIDA, open Settings and click **Uzantı klasörünü aç** (open extension folder). With the installer this is `%APPDATA%\AIDA\extension`; AIDA keeps that folder in sync with its own version.
+2. Open `chrome://extensions` and turn on **Developer mode** (top right).
+3. Click **Load unpacked** and choose that folder.
+
+When the extension connects, the badge at the top right turns to "Uzantı bağlı" (extension connected).
+
+**From source:**
+
 ```bash
 git clone https://github.com/sekullar/aida.git
 cd aida
 npm install
-```
-
-Load the Chrome extension:
-
-1. Open `chrome://extensions` and turn on **Developer mode** (top right).
-2. Click **Load unpacked** and choose the `extension` folder inside the project.
-3. Make sure **AIDA Bridge** appears in the list.
-
-Start the app:
-
-```bash
 npm start
 ```
 
-When the extension connects, the badge at the top right turns to "Uzantı bağlı" (extension connected).
+In this case load the project's `extension` folder in Chrome.
+
+### Versions and updates
+
+- The app, the Chrome extension and the GitHub Release tag always carry the same version.
+- **App updates:** Sentinel Hub compares the installed version with the latest Release and shows an Update button. AIDA itself also checks GitHub on startup and shows a "Yeni sürüm" (new version) badge when one is out.
+- **Extension updates:** the extension reports its version when it connects. If it differs from the version that came with the app, the badge turns red ("Uzantı güncel değil") and Settings shows how to reload it. Chrome does not reload unpacked extensions by itself, so after every update press the reload button on AIDA Bridge in `chrome://extensions`.
+- If more than one copy of AIDA Bridge is loaded, AIDA uses the one with the right version and ignores the rest; remove the extra copies.
+
+### Building
+
+```bash
+npm run dist        # installer in release/ (needs admin or Developer Mode on Windows)
+npm run dist:local  # same installer without admin rights
+```
+
+Releases are built by GitHub Actions: pushing a tag such as `v0.4.0` runs the tests, checks that the tag, `package.json` and `extension/manifest.json` versions match, builds the installer and publishes it.
 
 ### Usage
 
@@ -109,7 +126,7 @@ Chrome's **Memory Saver** can still put inactive tabs to sleep. Open `chrome://s
 - **A seat stays on "bağlanıyor" (connecting):** the extension is probably outdated. Open `chrome://extensions`, press the reload button on AIDA Bridge, and make sure there is only one copy of it. Then dismiss and re-invite the AI.
 - **"Mesaj gönderilemedi" (could not send):** the site's interface may have changed. Update that site's entry in the `SITES` table in `extension/content.js`.
 - **After every extension update:** reload AIDA Bridge in `chrome://extensions` and refresh the AI windows.
-- Check `debug.log` in the project folder to see exactly where a message got stuck.
+- Check `debug.log` (project folder, or `%APPDATA%\AIDA` with the installer) to see exactly where a message got stuck.
 
 ### Tests
 
@@ -117,7 +134,7 @@ Chrome's **Memory Saver** can still put inactive tabs to sleep. Open `chrome://s
 npm test
 ```
 
-Runs the engine tests (turn order, listening, limits, autopilot) and the minimized-window tests for `page.js`.
+Runs the engine tests (turn order, listening, limits, autopilot), the minimized-window tests for `page.js` and the version-control tests.
 
 ### Disclaimer
 
@@ -177,25 +194,42 @@ AIDA, Windows 11 üzerinde geliştirildi ve denendi.
 
 ### Kurulum
 
+**Kurulum dosyası (önerilen):** [son sürümden](../../releases/latest) `AIDA.Setup.<sürüm>.exe` dosyasını indirip çalıştır ya da AIDA'yı **[Sentinel Hub](https://github.com/sekullar/sentinel-hub)** üzerinden kur; Hub onu güncel de tutar. Kurulum dosyası kod imzalı değildir; Windows SmartScreen onay isteyebilir ("Daha fazla bilgi" → "Yine de çalıştır").
+
+Ardından Chrome uzantısını yükle:
+
+1. AIDA'da Ayarlar'ı aç ve **Uzantı klasörünü aç**'a tıkla. Kurulum dosyasıyla bu klasör `%APPDATA%\AIDA\extension` olur; AIDA bu klasörü kendi sürümüyle eşit tutar.
+2. `chrome://extensions` sayfasını aç, sağ üstten **Geliştirici modu**nu aç.
+3. **Paketlenmemiş öğe yükle**'ye tıkla ve o klasörü seç.
+
+Uzantı bağlanınca sağ üstteki rozet "Uzantı bağlı" olur.
+
+**Kaynak koddan:**
+
 ```bash
 git clone https://github.com/sekullar/aida.git
 cd aida
 npm install
-```
-
-Chrome uzantısını yükle:
-
-1. `chrome://extensions` sayfasını aç, sağ üstten **Geliştirici modu**nu aç.
-2. **Paketlenmemiş öğe yükle**'ye tıkla ve projedeki `extension` klasörünü seç.
-3. Listede **AIDA Bridge**'in göründüğünden emin ol.
-
-Uygulamayı başlat:
-
-```bash
 npm start
 ```
 
-Uzantı bağlanınca sağ üstteki rozet "Uzantı bağlı" olur.
+Bu durumda Chrome'a projedeki `extension` klasörünü yükle.
+
+### Sürümler ve güncellemeler
+
+- Uygulama, Chrome uzantısı ve GitHub Release etiketi her zaman aynı sürümü taşır.
+- **Uygulama güncellemesi:** Sentinel Hub kurulu sürümü son Release ile karşılaştırır ve Güncelle düğmesini gösterir. AIDA da açılışta GitHub'ı kontrol eder, yeni sürüm çıktıysa "Yeni sürüm" rozeti gösterir.
+- **Uzantı güncellemesi:** uzantı bağlanınca sürümünü bildirir. Uygulamayla gelen sürümden farklıysa rozet kırmızıya döner ("Uzantı güncel değil") ve Ayarlar'da nasıl yenileneceği yazar. Chrome paketlenmemiş uzantıları kendiliğinden yenilemez; her güncellemeden sonra `chrome://extensions` sayfasında AIDA Bridge'in yenile düğmesine bas.
+- Birden fazla AIDA Bridge kopyası yüklüyse AIDA doğru sürümdekini kullanır, diğerlerini yok sayar; fazla kopyaları kaldır.
+
+### Derleme
+
+```bash
+npm run dist        # release/ içinde kurulum dosyası (Windows'ta yönetici veya Geliştirici Modu gerekir)
+npm run dist:local  # aynı kurulum dosyası, yönetici hakkı olmadan
+```
+
+Release'ler GitHub Actions ile üretilir: `v0.4.0` gibi bir etiket push'lanınca testler çalışır, etiket, `package.json` ve `extension/manifest.json` sürümlerinin aynı olduğu denetlenir, kurulum dosyası derlenip yayınlanır.
 
 ### Kullanım
 
@@ -218,7 +252,7 @@ Chrome'un **Bellek Tasarrufu** özelliği yine de etkin olmayan sekmeleri uyutab
 - **Bir koltuk "bağlanıyor"da kalıyor:** uzantı büyük ihtimalle eski sürümde. `chrome://extensions` sayfasında AIDA Bridge'in yenile düğmesine bas ve yalnızca bir kopyasının yüklü olduğundan emin ol. Sonra o yapay zekayı masadan çıkarıp yeniden davet et.
 - **"Mesaj gönderilemedi":** sitenin arayüzü değişmiş olabilir. `extension/content.js` içindeki `SITES` tablosunda o sitenin seçicilerini güncelle.
 - **Her uzantı güncellemesinden sonra:** `chrome://extensions` sayfasında AIDA Bridge'i yenile ve yapay zeka pencerelerini yenile.
-- Bir mesajın tam olarak nerede takıldığını görmek için proje klasöründeki `debug.log` dosyasına bak.
+- Bir mesajın tam olarak nerede takıldığını görmek için `debug.log` dosyasına bak (proje klasöründe, kurulum dosyasıyla `%APPDATA%\AIDA` altında).
 
 ### Testler
 
@@ -226,7 +260,7 @@ Chrome'un **Bellek Tasarrufu** özelliği yine de etkin olmayan sekmeleri uyutab
 npm test
 ```
 
-Motor testlerini (söz sırası, dinleme, limitler, otopilot) ve `page.js` için küçültülmüş pencere testlerini çalıştırır.
+Motor testlerini (söz sırası, dinleme, limitler, otopilot), `page.js` için küçültülmüş pencere testlerini ve sürüm kontrolü testlerini çalıştırır.
 
 ### Sorumluluk notu
 

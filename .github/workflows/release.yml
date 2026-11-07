@@ -1,0 +1,43 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      # Version control: the tag, package.json and the bundled Chrome extension must carry the same version.
+      # Sentinel Hub compares the tag with the installed version; AIDA compares the extension with its own.
+      - name: Check tag matches the app and extension versions
+        shell: bash
+        run: |
+          APP=$(node -p "require('./package.json').version")
+          EXT=$(node -p "require('./extension/manifest.json').version")
+          TAG="${GITHUB_REF_NAME#v}"
+          echo "tag=$TAG app=$APP extension=$EXT"
+          test "$TAG" = "$APP" && test "$APP" = "$EXT"
+
+      - run: npm test
+
+      - run: npx electron-builder --win nsis --publish never
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            release/*.exe
+            release/latest.yml

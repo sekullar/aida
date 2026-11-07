@@ -1,14 +1,60 @@
 {
   "name": "aida",
-  "version": "0.1.0",
+  "version": "0.4.0",
   "description": "AIDA - Artificial Intelligence Debate Arena",
   "main": "main.js",
+  "author": "Ahmet Efe Korkmaz",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/sekullar/aida.git"
+  },
   "scripts": {
     "start": "electron .",
-    "test": "node test/engine.test.js && node test/page.test.js"
+    "test": "node test/engine.test.js && node test/page.test.js && node test/version.test.js",
+    "dist": "electron-builder --win nsis --publish never",
+    "dist:local": "node scripts/build-local.js"
   },
   "dependencies": {
-    "electron": "^45.2.3",
     "ws": "^8.22.1"
+  },
+  "devDependencies": {
+    "electron": "33.4.11",
+    "electron-builder": "25.1.8"
+  },
+  "build": {
+    "appId": "com.sekullar.aida",
+    "productName": "AIDA",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "src/**/*",
+      "renderer/**/*",
+      "assets/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "extension",
+        "to": "extension"
+      }
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
   }
 }

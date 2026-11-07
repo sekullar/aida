@@ -13,4 +13,7 @@ contextBridge.exposeInMainWorld('aida', {
   saveSettings: (s) => ipcRenderer.invoke('aida:settings', s),
   openExtensionFolder: () => ipcRenderer.invoke('aida:openExt'),
   launchChrome: () => ipcRenderer.invoke('aida:launchChrome'),
+  extensionPath: () => ipcRenderer.invoke('aida:extPath'),
+  openUpdate: () => ipcRenderer.invoke('aida:openUpdate'),
+  openLog: () => ipcRenderer.invoke('aida:openLog'),
 });

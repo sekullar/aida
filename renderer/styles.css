@@ -25,6 +25,11 @@ header { display: flex; justify-content: space-between; align-items: center; pad
 .ext-chip { font-size: 12px; padding: 4px 10px; border-radius: 99px; border: 1px solid var(--line); }
 .ext-chip.on { color: var(--ok); border-color: rgba(74,222,128,.4); }
 .ext-chip.off { color: var(--warn); border-color: rgba(251,191,36,.4); }
+.ext-chip.old { color: var(--danger); border-color: rgba(251,113,133,.5); }
+.ext-chip.upd { background: rgba(100,124,255,.15); color: var(--text); border-color: var(--accent); cursor: pointer; }
+.ext-chip.upd[hidden] { display: none; }
+.ver-info { margin-right: auto; color: var(--dim); font-size: 12px; align-self: center; }
+.tc-warn { color: var(--danger); font-size: 13px; line-height: 1.5; }
 
 main { display: grid; grid-template-columns: 1fr 380px; min-height: 0; }
 .stage { position: relative; min-height: 0; overflow: hidden; }
