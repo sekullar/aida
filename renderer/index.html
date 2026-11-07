@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'">
+<title>AIDA</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header>
+  <div class="brand"><img class="logo" src="../assets/logo.svg" alt=""><b>AIDA</b><span class="sub">Artificial Intelligence Debate Arena</span></div>
+  <div class="head-right">
+    <span id="extChip" class="ext-chip off">Uzantı bağlı değil</span>
+    <button id="btnNew" class="ghost" title="Tüm sohbetleri sıfırla">Yeni oturum</button>
+    <button id="btnSettings" class="icon" title="Ayarlar" aria-label="Ayarlar">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.8v2.4M12 18.8v2.4M2.8 12h2.4M18.8 12h2.4M5.5 5.5l1.7 1.7M16.8 16.8l1.7 1.7M5.5 18.5l1.7-1.7M16.8 7.2l1.7-1.7"/></svg>
+    </button>
+  </div>
+</header>
+
+<main>
+  <section class="stage" id="stage">
+    <div class="table" id="table">
+      <div class="table-center" id="center"></div>
+    </div>
+    <div id="seats"></div>
+    <div class="you-seat"><div class="you-dot"></div><span>Sen</span></div>
+  </section>
+  <aside class="log">
+    <div class="log-head"><span>Sohbet akışı</span><span id="roundInfo" class="dim"></span></div>
+    <div id="feed" class="feed"></div>
+  </aside>
+</main>
+
+<footer>
+  <div class="composer">
+    <textarea id="input" rows="2" placeholder="Masaya bir mesaj yaz… (Enter gönderir, Shift+Enter yeni satır)"></textarea>
+    <div class="actions">
+      <label class="switch" title="Durdurulana kadar yapay zekalar kendi aralarında konuşur">
+        <input type="checkbox" id="auto"><span class="track"><span class="thumb"></span></span><span class="sw-label">Otopilot</span>
+      </label>
+      <button id="btnStop" class="danger" hidden>Durdur</button>
+      <button id="btnSend" class="primary">Gönder</button>
+    </div>
+  </div>
+</footer>
+
+<div class="modal" id="modal" hidden>
+  <div class="dialog">
+    <div class="dialog-head"><h2>Ayarlar</h2><button id="btnClose" class="icon" aria-label="Kapat">✕</button></div>
+
+    <h3>Masaya davet et</h3>
+    <div id="inviteList" class="invite-list"></div>
+
+    <h3>Chrome uzantısı</h3>
+    <div class="ext-box" id="extBox"></div>
+
+    <h3>Tartışma</h3>
+    <div class="grid3">
+      <label>Cevap uzunluğu (kelime)<input type="number" id="setWords" min="20" max="1000"></label>
+      <label>Zaman aşımı (sn)<input type="number" id="setTimeout" min="30" max="1800"></label>
+      <label>Otopilot tur sınırı (0 = sınırsız)<input type="number" id="setRounds" min="0" max="500"></label>
+    </div>
+    <div class="dialog-foot"><button id="btnSave" class="primary">Kaydet</button></div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>

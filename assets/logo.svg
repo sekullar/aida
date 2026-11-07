@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#232F4A"/>
+      <stop offset="1" stop-color="#101522"/>
+    </linearGradient>
+    <linearGradient id="ring" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#647CFF"/>
+      <stop offset="1" stop-color="#A78BFA"/>
+    </linearGradient>
+    <radialGradient id="table" cx="0.5" cy="0.42" r="0.62">
+      <stop offset="0" stop-color="#2C3960"/>
+      <stop offset="1" stop-color="#151C2E"/>
+    </radialGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#647CFF" stop-opacity="0.55"/>
+      <stop offset="1" stop-color="#647CFF" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="rainbow" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#4285F4"/>
+      <stop offset="0.5" stop-color="#9B72CB"/>
+      <stop offset="1" stop-color="#D96570"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="512" height="512" rx="116" fill="url(#bg)"/>
+
+  <!-- yuvarlak masa -->
+  <circle cx="256" cy="250" r="118" fill="url(#table)" stroke="url(#ring)" stroke-width="18"/>
+
+  <!-- ortada karşılıklı iki konuşma balonu: tartışma -->
+  <path d="M196 214a22 22 0 0 1 22-22h52a22 22 0 0 1 22 22v24a22 22 0 0 1-22 22h-30l-22 18v-18a22 22 0 0 1-22-22z" fill="#F1F5F9"/>
+  <path d="M316 262a20 20 0 0 0-20-20h-46a20 20 0 0 0-20 20v22a20 20 0 0 0 20 20h26l20 16v-16a20 20 0 0 0 20-20z" fill="url(#ring)" stroke="#151C2E" stroke-width="7"/>
+
+  <!-- koltuklar: masanın üst yayında yapay zekalar -->
+  <circle cx="92" cy="282" r="28" fill="#FFFFFF"/>
+  <circle cx="132" cy="134" r="28" fill="url(#rainbow)"/>
+  <circle cx="256" cy="74" r="28" fill="#D97757"/>
+  <circle cx="380" cy="134" r="28" fill="#4D6BFE"/>
+  <circle cx="420" cy="282" r="28" fill="#A78BFA"/>
+
+  <!-- kullanıcı koltuğu: altta parlayan -->
+  <circle cx="256" cy="430" r="46" fill="url(#glow)"/>
+  <circle cx="256" cy="430" r="22" fill="#647CFF"/>
+</svg>

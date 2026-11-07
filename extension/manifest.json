@@ -1,0 +1,76 @@
+{
+  "manifest_version": 3,
+  "name": "AIDA Bridge",
+  "version": "0.3.1",
+  "description": "AIDA masaüstü uygulamasını yapay zeka sohbet sekmelerine bağlar.",
+  "icons": {
+    "16": "icons/icon-16.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  },
+  "permissions": [
+    "tabs",
+    "storage",
+    "alarms"
+  ],
+  "host_permissions": [
+    "https://chatgpt.com/*",
+    "https://chat.openai.com/*",
+    "https://gemini.google.com/*",
+    "https://claude.ai/*",
+    "https://chat.deepseek.com/*",
+    "https://www.kimi.ai/*",
+    "https://kimi.ai/*",
+    "https://www.kimi.com/*",
+    "https://kimi.com/*",
+    "https://grok.com/*",
+    "https://chat.qwen.ai/*",
+    "https://chat.mistral.ai/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://chatgpt.com/*",
+        "https://chat.openai.com/*",
+        "https://gemini.google.com/*",
+        "https://claude.ai/*",
+        "https://chat.deepseek.com/*",
+        "https://www.kimi.ai/*",
+        "https://kimi.ai/*",
+        "https://www.kimi.com/*",
+        "https://kimi.com/*",
+        "https://grok.com/*",
+        "https://chat.qwen.ai/*",
+        "https://chat.mistral.ai/*"
+      ],
+      "js": [
+        "page.js"
+      ],
+      "run_at": "document_start",
+      "world": "MAIN"
+    },
+    {
+      "matches": [
+        "https://chatgpt.com/*",
+        "https://chat.openai.com/*",
+        "https://gemini.google.com/*",
+        "https://claude.ai/*",
+        "https://chat.deepseek.com/*",
+        "https://www.kimi.ai/*",
+        "https://kimi.ai/*",
+        "https://www.kimi.com/*",
+        "https://kimi.com/*",
+        "https://grok.com/*",
+        "https://chat.qwen.ai/*",
+        "https://chat.mistral.ai/*"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ]
+}

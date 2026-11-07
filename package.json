@@ -1,0 +1,14 @@
+{
+  "name": "aida",
+  "version": "0.1.0",
+  "description": "AIDA - Artificial Intelligence Debate Arena",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "test": "node test/engine.test.js && node test/page.test.js"
+  },
+  "dependencies": {
+    "electron": "^45.2.3",
+    "ws": "^8.22.1"
+  }
+}
