@@ -188,6 +188,7 @@ function openSettings() {
   $('setWords').value = S.settings.maxWords;
   $('setTimeout').value = S.settings.timeoutSec;
   $('setRounds').value = S.settings.maxRounds;
+  $('setSave').checked = !!S.settings.saveTranscript;
   $('modal').hidden = false;
   renderSettings();
 }
@@ -196,7 +197,7 @@ $('btnSettings').onclick = openSettings;
 $('btnClose').onclick = () => { settingsOpen = false; $('modal').hidden = true; };
 $('modal').onclick = (e) => { if (e.target === $('modal')) $('btnClose').click(); };
 $('btnSave').onclick = async () => {
-  await window.aida.saveSettings({ maxWords: $('setWords').value, timeoutSec: $('setTimeout').value, maxRounds: $('setRounds').value });
+  await window.aida.saveSettings({ maxWords: $('setWords').value, timeoutSec: $('setTimeout').value, maxRounds: $('setRounds').value, saveTranscript: $('setSave').checked });
   $('btnClose').click();
 };
 $('btnSend').onclick = send;

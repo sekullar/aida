@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "AIDA Bridge",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "AIDA masaüstü uygulamasını yapay zeka sohbet sekmelerine bağlar.",
   "icons": {
     "16": "icons/icon-16.png",

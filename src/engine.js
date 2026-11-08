@@ -12,7 +12,7 @@ const AIS = [
   { id: 'lechat', name: 'Le Chat', url: 'https://chat.mistral.ai/chat' },
 ];
 
-const DEFAULT_SETTINGS = { maxWords: 200, timeoutSec: 600, maxRounds: 0 };
+const DEFAULT_SETTINGS = { maxWords: 200, timeoutSec: 600, maxRounds: 0, saveTranscript: false };
 
 const END_TAG = /\s*\[\[\s*B[İI]T[İI]R\s*\]\]\s*/gi;
 const isMuted = (t) => /^[\W_]*muted[\W_]*$/i.test(String(t || '').trim());
@@ -83,6 +83,7 @@ class Engine extends EventEmitter {
   addEntry(from, text, kind = 'say', deliver = false) {
     const e = { id: this.nextEntry++, from, text, kind, deliver, ts: Date.now() };
     this.transcript.push(e);
+    this.emit('entry', e);
     return e;
   }
   addSystem(text, deliver = false) { this.addEntry('system', text, 'system', deliver); }
@@ -93,6 +94,7 @@ class Engine extends EventEmitter {
       maxWords: n(s.maxWords, 200, 20, 1000),
       timeoutSec: n(s.timeoutSec, 600, 30, 1800),
       maxRounds: n(s.maxRounds, 0, 0, 500),
+      saveTranscript: !!s.saveTranscript,
     };
     this.changed();
   }

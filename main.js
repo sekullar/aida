@@ -84,6 +84,20 @@ app.whenReady().then(() => {
 `); } catch {}
   engine.on('log', (line) => { try { fs.appendFileSync(logFile, `[${new Date().toISOString().slice(11, 23)}] ${line}
 `); } catch {} });
+  // Geliştirici ayarı: açıksa konuşma sohbet.txt dosyasına canlı yazılır (başka araçlar okuyabilsin diye)
+  const chatFile = path.join(path.dirname(logFile), 'sohbet.txt');
+  engine.on('entry', (e) => {
+    if (!engine.settings.saveTranscript) return;
+    try {
+      const line = `[${new Date(e.ts).toLocaleTimeString('tr-TR')}] ${e.from}: ${String(e.text).replace(/\s+$/, '')}
+
+`;
+      if (engine.transcript.length <= 1) fs.writeFileSync(chatFile, `--- AIDA sohbeti ${new Date().toISOString()} ---
+
+${line}`);
+      else fs.appendFileSync(chatFile, line);
+    } catch {}
+  });
   bridge.on('error-state', push);
   bridge.start();
 
