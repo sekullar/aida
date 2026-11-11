@@ -6,6 +6,7 @@
 
   const SITES = {
     chatgpt: {
+      lineBreak: true, // yeni ChatGPT kutusunda insertParagraph = Enter (gönderir); satır sonu için insertLineBreak
       input: ['#prompt-textarea', 'div.ProseMirror[contenteditable="true"]', 'textarea[name="prompt-textarea"]'],
       send: ['button[data-testid="send-button"]', 'button[aria-label="Send prompt"]', 'button[aria-label*="gönder" i]'],
       stop: ['button[data-testid="stop-button"]', 'button[aria-label="Stop streaming"]', 'button[aria-label*="stop" i]', 'button[aria-label*="durdur" i]'],
@@ -157,7 +158,7 @@
   function snapshot() {
     const msgs = qsa(S.messages);
     const last = msgs[msgs.length - 1];
-    return { count: msgs.length, lastText: last ? S.read(last) : '' };
+    return { count: msgs.length, lastText: last ? S.read(last) : '', users: qsa(S.userMessages).length };
   }
 
   function detectLimit() {
@@ -175,7 +176,26 @@
   }
 
   // ---------- yazma / gönderme ----------
-  async function setInput(el, text) {
+  // Taslak kalıntısını temizle: bazı editörler (Kimi) eski taslağı geri yüklüyor; tek yöntem yetmiyor
+  async function clearInput(el) {
+    if (el.tagName === 'TEXTAREA') {
+      const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set;
+      setter.call(el, ''); el.dispatchEvent(new Event('input', { bubbles: true }));
+      return !el.value;
+    }
+    for (let k = 0; k < 4; k++) {
+      el.focus();
+      const r = document.createRange(); r.selectNodeContents(el); const g = getSelection(); g.removeAllRanges(); g.addRange(r);
+      document.execCommand('selectAll');
+      el.dispatchEvent(new KeyboardEvent('keydown', { key: 'Backspace', code: 'Backspace', keyCode: 8, which: 8, bubbles: true, cancelable: true }));
+      document.execCommand('delete');
+      await sleep(150);
+      if (!el.innerText.trim()) return true;
+    }
+    return false;
+  }
+
+  async function setInput(el, text, signal) {
     el.focus();
     if (el.tagName === 'TEXTAREA') {
       const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set;
@@ -184,17 +204,21 @@
       return;
     }
     const sel = () => { const r = document.createRange(); r.selectNodeContents(el); const g = getSelection(); g.removeAllRanges(); g.addRange(r); };
-    const clear = () => { el.focus(); sel(); document.execCommand('delete'); };
     const lines = text.split(String.fromCharCode(10)).map((l) => l.split(String.fromCharCode(13)).join(''));
     const full = lines.filter(Boolean);
-    // Metin girdi mi, satırlar birbirine yapışmadı mı ("testi.Sadece" gibi)
-    const has = () => norm(el.innerText).includes(norm(text).slice(0, 30))
-      && (full.length < 2 || flat(el.innerText).includes(flat(full[0] + ' ' + full[1])));
+    const src = norm(text);
+    // Metin tam girdi mi: başı, sonu ve uzunluğu tutmalı (eski taslak kalıntısı eklenmişse uzunluk bozulur);
+    // satırlar birbirine yapışmamalı ("testi.Sadece" gibi)
+    const has = () => {
+      const cur = norm(el.innerText);
+      return cur.includes(src.slice(0, 30)) && cur.includes(src.slice(-25))
+        && cur.length >= src.length * 0.97 && cur.length <= src.length * 1.05 + 4
+        && (full.length < 2 || flat(el.innerText).includes(flat(full[0] + ' ' + full[1])));
+    };
     // Lexical/tiptap gibi editörler: önce temizle, sonra yapıştırma olayı (seçim editöre geç ulaşıyor, beklemek şart)
     const pasteIn = async () => {
       el.focus(); sel(); await sleep(120);
-      document.execCommand('delete'); await sleep(200);
-      if (el.innerText.trim()) { sel(); document.execCommand('selectAll'); await sleep(120); }
+      await clearInput(el);
       const dt = new DataTransfer();
       dt.setData('text/plain', text);
       el.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }));
@@ -204,7 +228,7 @@
       await pasteIn();
       if (has()) return;
     }
-    clear();
+    await clearInput(el);
     // Satır satır yaz: Quill/ProseMirror çok satırlı insertText'i bozabiliyor
     // Quill (Gemini) her paragraftan sonra kendini yeniden çizer; imleci sona alıp kısa süre beklemek şart.
     // Gizli sekmede setTimeout >=1 sn'ye yavaşlar, bu yüzden orada MessageChannel ile görev geçişi kullanıyoruz.
@@ -213,11 +237,15 @@
       for (let k = 0; k < 3; k++) await new Promise((r) => { const c = new MessageChannel(); c.port1.onmessage = () => r(); c.port2.postMessage(0); });
     };
     const caretEnd = () => { const r = document.createRange(); r.selectNodeContents(el); r.collapse(false); const g = getSelection(); g.removeAllRanges(); g.addRange(r); };
+    const nl = S.lineBreak ? 'insertLineBreak' : 'insertParagraph';
     await pause();
     for (let i = 0; i < lines.length; i++) {
+      if (signal && signal.aborted) throw err('cancelled');
       caretEnd();
-      if (i > 0) { document.execCommand('insertParagraph'); await pause(); caretEnd(); }
+      if (i > 0) { document.execCommand(nl); await pause(); caretEnd(); }
       if (lines[i]) { document.execCommand('insertText', false, lines[i]); await pause(); }
+      // Editör yazarken kendiliğinden göndermişse (Enter sanıldı) devam etme: yarım istem gitmesin
+      if (i < lines.length - 1 && isGenerating()) throw err('sent-early', 'yazarken kutu erken gönderdi');
     }
     await sleep(300);
     if (has()) return;
@@ -235,13 +263,13 @@
     el.dispatchEvent(new KeyboardEvent('keyup', o));
   }
 
-  async function submit(input, signal) {
+  async function submit(input, signal, base) {
     const btn = await waitFor(() => {
       const b = qs(S.send);
       return b && enabled(b) ? b : null;
     }, 6000, signal);
     if (btn) btn.click(); else pressEnter(input);
-    const ok = () => isGenerating() || inputEmpty(input);
+    const ok = () => isGenerating() || inputEmpty(input) || !input.isConnected || (base && qsa(S.userMessages).length > base.users);
     if (!(await waitFor(ok, 6000, signal))) {
       pressEnter(input);
       if (!(await waitFor(ok, 5000, signal))) throw err('send-failed');
@@ -268,7 +296,7 @@
 
   async function awaitResponse(base, signal, timeoutMs) {
     const t0 = Date.now();
-    let started = false, sawGenerating = false, lastText = '', lastChange = Date.now(), lastLimitCheck = 0, lastDbg = 0;
+    let started = false, sawGenerating = false, lastText = '', lastChange = Date.now(), lastLimitCheck = 0, lastDbg = 0, askedVisible = false;
     for (;;) {
       if (signal.aborted) throw err('cancelled');
       const msgs = qsa(S.messages);
@@ -281,6 +309,11 @@
       if (!started && (changed || generating)) { started = true; lastText = text; lastChange = Date.now(); }
 
       if (started) {
+        // Üretim bitti ama sayfada metin yok (sanal liste gizliyken öğe çizmiyor olabilir): görünür yapmayı dene, olmazsa pes et
+        if (!text && !generating && Date.now() - lastChange > 15000 && !askedVisible && document.visibilityState !== 'visible') {
+          askedVisible = true; report({ type: 'needVisible' });
+        }
+        if (!text && !generating && Date.now() - lastChange > 45000) throw err('no-response', 'cevap metni okunamadı');
         if (text !== lastText) { lastText = text; lastChange = Date.now(); }
         const stable = Date.now() - lastChange;
         const need = sawGenerating ? 1500 : 8000;
@@ -308,23 +341,42 @@
     const ac = new AbortController();
     jobs.set(reqId, ac);
     try {
-      const input = await waitFor(findInput, 8000, ac.signal);
+      let input = await waitFor(findInput, 8000, ac.signal);
       if (!input) throw err(qs(S.loggedOut) ? 'login' : 'no-input');
       if (detectLimit()) throw err('limit');
       await waitFor(() => !isGenerating(), 90000, ac.signal);
       const base = snapshot();
       report({ type: 'status', reqId, phase: 'typing' });
-      try {
-        await setInput(input, text);
-      } catch (e) {
-        // Son çare: gizli sayfada yazılamadıysa pencereyi bir anlığına görünür yapıp tekrar dene
-        if (e.code !== 'send-failed' || document.visibilityState === 'visible') throw e;
-        report({ type: 'needVisible' });
-        await waitFor(() => document.visibilityState === 'visible', 5000, ac.signal);
-        await sleep(300);
-        await setInput(input, text);
+      // Hiçbir şey gitmediyse bir kez daha dene; bir şey gittiyse (ör. erken gönderim) asla tekrar yazma
+      const sentSince = () => isGenerating() || qsa(S.userMessages).length > base.users || qsa(S.messages).length > base.count;
+      let fail = null;
+      for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+          if (attempt) { await sleep(1500); input = findInput() || input; }
+          try {
+            await setInput(input, text, ac.signal);
+          } catch (e) {
+            // Son çare: gizli sayfada yazılamadıysa pencereyi bir anlığına görünür yapıp tekrar dene
+            if (e.code !== 'send-failed' || document.visibilityState === 'visible') throw e;
+            report({ type: 'needVisible' });
+            await waitFor(() => document.visibilityState === 'visible', 5000, ac.signal);
+            await sleep(300);
+            input = findInput() || input;
+            await setInput(input, text, ac.signal);
+          }
+          await submit(input, ac.signal, base);
+          fail = null;
+          break;
+        } catch (e) {
+          fail = e;
+          if (e.code !== 'send-failed' || sentSince()) break;
+        }
       }
-      await submit(input, ac.signal);
+      if (fail) {
+        // Kutuda taslak kalmasın (Kimi gibi siteler eski taslağı sonraki istemin üstüne ekliyor)
+        if (!sentSince()) { try { await clearInput(findInput() || input); } catch {} }
+        throw fail;
+      }
       report({ type: 'status', reqId, phase: 'generating' });
       const out = await awaitResponse(base, ac.signal, timeoutMs || 600000);
       debugSnap('done', { outLen: out.length });
@@ -344,7 +396,7 @@
       waiters.slice().forEach((w) => w());
     }
     else if (msg.cmd === 'ask') { handleAsk(msg); sendResponse({ ack: true }); }
-    else if (msg.cmd === 'cancel') jobs.forEach((ac) => ac.abort());
+    else if (msg.cmd === 'cancel') { if (msg.reqId) { const ac = jobs.get(msg.reqId); if (ac) ac.abort(); } else jobs.forEach((ac) => ac.abort()); }
     else if (msg.cmd === 'probe') { sendResponse({ ready: !!findInput() }); lastState = null; }
   });
 

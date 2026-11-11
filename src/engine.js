@@ -22,6 +22,7 @@ const ERR_TEXT = {
   timeout: 'Zaman aşımı',
   'no-input': 'Mesaj kutusu bulunamadı',
   'send-failed': 'Mesaj gönderilemedi',
+  'sent-early': 'Mesaj yarım gitti',
   'bridge-lost': 'Uzantı bağlantısı koptu',
   'tab-unreachable': 'Sekmeye ulaşılamadı',
   failed: 'Bilinmeyen hata',
@@ -159,10 +160,14 @@ class Engine extends EventEmitter {
   ask(seat, text, kind) {
     return new Promise((resolve) => {
       const reqId = this.nextReq++;
-      const timeoutMs = this.settings.timeoutSec * 1000;
+      // Dinleyenin cevabı sadece -muted-: uzun beklemek turu kilitler, o yüzden kısa sınır
+      const timeoutMs = kind === 'listen' ? Math.min(this.settings.timeoutSec, 100) * 1000 : this.settings.timeoutSec * 1000;
       const timer = setTimeout(() => {
-        if (this.pending.delete(reqId)) resolve({ ok: false, error: 'timeout' });
-      }, timeoutMs + 25000);
+        if (this.pending.delete(reqId)) {
+          this.bridge.send({ type: 'cancel', reqId });
+          resolve({ ok: false, error: 'timeout' });
+        }
+      }, timeoutMs + (kind === 'listen' ? 15000 : 25000));
       this.pending.set(reqId, { resolve, seat: seat.id, seatObj: seat, kind, timer });
       this.log('->', { type: 'ask', reqId, ai: seat.id, kind, text });
       const sent = this.bridge.send({ type: 'ask', reqId, ai: seat.id, text, timeoutMs });
@@ -185,7 +190,7 @@ class Engine extends EventEmitter {
     if (!s || s.invited) return { ok: false, error: 'already' };
     if (!this.bridge.connected()) return { ok: false, error: 'no-extension' };
     s.invited = true; s.conn = 'opening'; s.status = 'idle'; s.note = 'Sekme açılıyor';
-    s.seen = 0; s.intro = false; s.fails = 0;
+    s.seen = 0; s.intro = false; s.fails = 0; s.listenFails = 0;
     this.bridge.send({ type: 'open', ai: s.id, url: s.url, bounds: this.getBounds ? this.getBounds(s.id, this.seats.filter((x) => x.invited).indexOf(s)) : undefined });
     this.addSystem(`${s.name} masaya davet edildi.`);
     this.changed();
@@ -204,7 +209,7 @@ class Engine extends EventEmitter {
   resetSeat(id) {
     const s = this.seat(id);
     if (!s) return;
-    s.status = 'idle'; s.fails = 0; s.note = '';
+    s.status = 'idle'; s.fails = 0; s.listenFails = 0; s.note = '';
     this.changed();
   }
 
@@ -214,7 +219,7 @@ class Engine extends EventEmitter {
     this.round = 0;
     this.phase = '';
     for (const s of this.seats) {
-      s.seen = 0; s.intro = false; s.fails = 0; s.status = 'idle'; s.note = '';
+      s.seen = 0; s.intro = false; s.fails = 0; s.listenFails = 0; s.status = 'idle'; s.note = '';
       if (s.invited) { s.conn = 'opening'; s.note = 'Yeni sohbet açılıyor'; this.bridge.send({ type: 'open', ai: s.id, url: s.url, bounds: this.getBounds ? this.getBounds(s.id, this.seats.filter((x) => x.invited).indexOf(s)) : undefined }); }
     }
     this.changed();
@@ -272,7 +277,7 @@ class Engine extends EventEmitter {
   }
 
   // ---------- tur ----------
-  failSeat(seat, res) {
+  failSeat(seat, res, soft = false) {
     const err = res.error;
     if (err === 'cancelled') { seat.status = 'idle'; seat.note = ''; return; }
     if (err === 'limit') {
@@ -284,6 +289,11 @@ class Engine extends EventEmitter {
     } else if (err === 'tab-closed') {
       seat.conn = 'closed'; seat.status = 'idle'; seat.note = 'Sekme kapatıldı';
       this.addSystem(`${seat.name} sekmesi kapalı, atlandı.`);
+    } else if (soft) {
+      // Dinleme hatası: bu AI'yı hataya düşürme; mesaj kendi sırasında zaten iletilecek (seen ilerlemedi)
+      seat.listenFails = (seat.listenFails || 0) + 1;
+      seat.status = 'idle'; seat.note = 'dinleyemedi';
+      this.addSystem(`${seat.name} dinleme mesajını almadı (${ERR_TEXT[err] || ERR_TEXT.failed}); sırası gelince birlikte iletilecek.`);
     } else {
       seat.fails++;
       seat.note = ERR_TEXT[err] || ERR_TEXT.failed;
@@ -299,11 +309,11 @@ class Engine extends EventEmitter {
     this.changed();
     const res = await this.ask(seat, this.buildListen(seat, items), 'listen');
     if (res.ok) {
-      seat.seen = upto; seat.intro = true; seat.fails = 0;
+      seat.seen = upto; seat.intro = true; seat.fails = 0; seat.listenFails = 0;
       seat.status = 'muted'; seat.note = '-muted-';
     } else {
       if (seat.status === 'listening') seat.status = 'idle';
-      this.failSeat(seat, res);
+      this.failSeat(seat, res, true);
     }
     this.changed();
   }
@@ -340,10 +350,21 @@ class Engine extends EventEmitter {
 
   async turn(seat) {
     this.phase = `${seat.name} konuşuyor`;
-    const listeners = this.seats.filter((s) => s !== seat && this.usable(s) && this.delta(s).items.length > 0);
+    const listeners = this.seats.filter((s) => s !== seat && this.usable(s) && (s.listenFails || 0) < 2 && this.delta(s).items.length > 0);
     const lp = listeners.map((s) => this.listen(s));
     const r = await this.speak(seat);
-    await Promise.all(lp);
+    const waitFor = () => listeners.filter((s) => s.status === 'listening').map((s) => s.name);
+    if (waitFor().length) {
+      this.phase = `Dinleyenler bekleniyor: ${waitFor().join(', ')}`;
+      this.changed();
+      const iv = setInterval(() => {
+        const w = waitFor();
+        if (w.length) { this.phase = `Dinleyenler bekleniyor: ${w.join(', ')}`; this.changed(); }
+      }, 3000);
+      try { await Promise.all(lp); } finally { clearInterval(iv); }
+    } else {
+      await Promise.all(lp);
+    }
     return r;
   }
 

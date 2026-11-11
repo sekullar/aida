@@ -121,6 +121,12 @@ async function handleCommand(m) {
       send({ type: 'result', reqId: m.reqId, ai: m.ai, ok: false, error: 'tab-unreachable' });
     }
   } else if (m.type === 'cancel') {
+    if (m.reqId) {
+      const id = active.get(m.reqId);
+      if (id) chrome.tabs.sendMessage(id, { cmd: 'cancel', reqId: m.reqId }).catch(() => {});
+      active.delete(m.reqId);
+      return;
+    }
     for (const id of new Set(active.values())) chrome.tabs.sendMessage(id, { cmd: 'cancel' }).catch(() => {});
     active.clear();
   }
