@@ -52,6 +52,9 @@
     kimi: {
       input: ['div.chat-input-editor[contenteditable="true"]', '[data-lexical-editor="true"]'],
       paste: true,
+      // Uzun yapıştırma "TXT dosyası" ekine dönüşüyor (~3000 karakter üstü); bu yüzden parça parça yapıştırılır
+      pasteChunk: 1500,
+      attachDelete: '.chat-editor-attachment-area .file-card-delete',
       send: ['.send-button-container'],
       stop: ['.send-button-container.stop', '.send-button-container.loading'],
       messages: ['.segment-assistant'],
@@ -178,6 +181,8 @@
   // ---------- yazma / gönderme ----------
   // Taslak kalıntısını temizle: bazı editörler (Kimi) eski taslağı geri yüklüyor; tek yöntem yetmiyor
   async function clearInput(el) {
+    // Önceki başarısız denemelerden kalan ekler (ör. Kimi'nin TXT kartları) mesajla birlikte gitmesin
+    if (S.attachDelete) for (let k = 0; k < 60; k++) { const d = document.querySelector(S.attachDelete); if (!d) break; d.click(); await sleep(120); }
     if (el.tagName === 'TEXTAREA') {
       const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set;
       setter.call(el, ''); el.dispatchEvent(new Event('input', { bubbles: true }));
@@ -216,8 +221,31 @@
         && (full.length < 2 || flat(el.innerText).includes(flat(full[0] + ' ' + full[1])));
     };
     // Lexical/tiptap gibi editörler: önce temizle, sonra yapıştırma olayı (seçim editöre geç ulaşıyor, beklemek şart)
+    const caretEndFn = () => { const r = document.createRange(); r.selectNodeContents(el); r.collapse(false); const g = getSelection(); g.removeAllRanges(); g.addRange(r); };
     const pasteIn = async () => {
       el.focus(); sel(); await sleep(120);
+      if (S.pasteChunk) {
+        // Tümünü seçip ilk parçayla değiştir (silmek Lexical'da kalıntı bırakıyor), sonrakileri sona ekle
+        if (S.attachDelete) for (let k = 0; k < 60; k++) { const d = document.querySelector(S.attachDelete); if (!d) break; d.click(); await sleep(120); }
+        const parts = []; let cur = '';
+        for (const l of lines) {
+          if (cur && (cur + String.fromCharCode(10) + l).length > S.pasteChunk) { parts.push(cur); cur = l; } else cur = cur ? cur + String.fromCharCode(10) + l : l;
+        }
+        parts.push(cur);
+        const fire = async (t) => {
+          const dt = new DataTransfer(); dt.setData('text/plain', t);
+          el.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }));
+          await sleep(450);
+        };
+        sel(); document.execCommand('selectAll'); await sleep(250);
+        await fire(parts[0]);
+        for (let i = 1; i < parts.length; i++) {
+          if (signal && signal.aborted) throw err('cancelled');
+          el.focus(); caretEndFn(); await sleep(200);
+          await fire(String.fromCharCode(10) + parts[i]);
+        }
+        return;
+      }
       await clearInput(el);
       const dt = new DataTransfer();
       dt.setData('text/plain', text);
@@ -290,7 +318,7 @@
       lastTail: last ? S.read(last).slice(-80) : '', stops,
       streamingAttr: S.streaming ? !!document.querySelector(S.streaming) : null,
       send: sendEl ? (sendEl.getAttribute('aria-label') || sendEl.getAttribute('data-testid') || sendEl.className) : null,
-      url: location.pathname, ...extra,
+      url: location.pathname, vis: document.visibilityState, focus: document.hasFocus(), ...extra,
     } });
   }
 
@@ -310,7 +338,7 @@
 
       if (started) {
         // Üretim bitti ama sayfada metin yok (sanal liste gizliyken öğe çizmiyor olabilir): görünür yapmayı dene, olmazsa pes et
-        if (!text && !generating && Date.now() - lastChange > 15000 && !askedVisible && document.visibilityState !== 'visible') {
+        if (!text && !generating && Date.now() - lastChange > 15000 && !askedVisible) {
           askedVisible = true; report({ type: 'needVisible' });
         }
         if (!text && !generating && Date.now() - lastChange > 45000) throw err('no-response', 'cevap metni okunamadı');
@@ -352,7 +380,11 @@
       let fail = null;
       for (let attempt = 0; attempt < 2; attempt++) {
         try {
-          if (attempt) { await sleep(1500); input = findInput() || input; }
+          if (attempt) {
+            // İlk deneme olmadıysa çoğunlukla pencere başka pencerelerin arkasında ve site güncellenmiyor: öne getir
+            report({ type: 'needVisible' });
+            await sleep(1500); input = findInput() || input;
+          }
           try {
             await setInput(input, text, ac.signal);
           } catch (e) {

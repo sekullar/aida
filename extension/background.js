@@ -147,7 +147,8 @@ chrome.runtime.onMessage.addListener((msg, sender) => {
       // Sekme gizliyse görünür yap (odağı çalmadan): sekmeyi etkinleştir, küçültülmüşse geri getir
       chrome.tabs.update(tabId, { active: true }).catch(() => {});
       chrome.tabs.get(tabId).then((t) => chrome.windows.get(t.windowId)).then((w) => {
-        if (w.state === 'minimized') chrome.windows.update(w.id, { state: 'normal', focused: false });
+        // Başka pencerelerin arkasındaki pencere "gizli" sayılır ve siteler güncellenmez: son çare olarak öne getir
+        chrome.windows.update(w.id, w.state === 'minimized' ? { state: 'normal', focused: true } : { focused: true });
       }).catch(() => {});
     }
     else if (msg.type === 'debug') send({ type: 'debug', ai, data: msg.data });
