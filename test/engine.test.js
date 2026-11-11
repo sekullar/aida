@@ -43,8 +43,11 @@ async function setup(script) {
     const asks = bridge.log.filter((m) => m.type === 'ask');
     const turn2 = asks.find((m) => m.ai === 'gemini' && m.text.includes('SIRA: SENDE —'));
     assert(turn2.text.includes('ChatGPT: chatgpt cevabı'), 'Gemini ChatGPT cevabını görmeli');
-    assert(asks.some((m) => m.ai === 'claude' && m.text.includes('SIRA: DİNLE —') && m.text.includes('Kullanıcı: Merhaba masa')), 'Claude soruyu dinlemeli');
-    console.log('ok 1: manuel tur sırası ve dinleme');
+    assert(!asks.some((m) => m.text.includes('SIRA: DİNLE')), 'dinleyenlere ayrı mesaj gitmemeli');
+    assert.strictEqual(asks.length, 3, 'her yapay zekaya yalnızca kendi sırasında 1 mesaj');
+    const turn3 = asks.find((m) => m.ai === 'claude');
+    assert(turn3.text.includes('Kullanıcı: Merhaba masa') && turn3.text.includes('ChatGPT: chatgpt cevabı') && turn3.text.includes('Gemini: gemini cevabı'), 'Claude öncekilerin hepsini tek mesajda almalı');
+    console.log('ok 1: manuel tur sırası, geçmiş tek mesajda');
   }
   // 2) Limit: Gemini limit dolunca pas geçilir ve tespit edilir
   {

@@ -245,7 +245,7 @@ class Engine extends EventEmitter {
       `Sen "AIDA" (Artificial Intelligence Debate Arena) adlı bir yuvarlak masa tartışmasına katılıyorsun. Masadakiler: ${names}. Sen: ${seat.name}.`,
       'KURALLAR:',
       '1) Her mesajım "[AIDA]" ile başlar ve masada konuşulanları "Kullanıcı:", "ChatGPT:" gibi etiketlerle aktarır.',
-      '2) Mesajın sonunda "SIRA: SENDE" yazıyorsa cevap ver. "SIRA: DİNLE" yazıyorsa sadece dinle ve cevabın tam olarak -muted- olsun; başka hiçbir şey yazma.',
+      '2) Mesajın sonunda "SIRA: SENDE" yazar; o zaman cevap ver. Mesaj, son konuşmandan beri masada geçenlerin hepsini tek seferde içerir.',
       `3) Sıran geldiğinde kısa ve öz yaz (en fazla yaklaşık ${this.settings.maxWords} kelime). Diğerlerinin fikirlerine atıf yapabilir, katılabilir ya da gerekçeyle itiraz edebilirsin. Cevabına kendi adını etiket olarak yazma.`,
       '4) Eklemek istediğin yeni bir şey yoksa sıran gelse bile sadece -muted- yaz.',
       '5) Otopilot modunda kullanıcı araya girmez, tartışma sürer. Konunun tükendiğini ve sohbeti bitirmek istediğini düşünürsen cevabının en sonuna [[BITIR]] ekle. Herkes bitirmek isterse sohbet kapanır.',
@@ -348,24 +348,11 @@ class Engine extends EventEmitter {
     return { spoke: true, passed: false, wantsEnd };
   }
 
+  // Dinleyenlere ayrı mesaj gitmez: her yapay zeka sırası gelince, son konuşmasından beri
+  // masada geçen her şeyi (delta) tek mesajda alır.
   async turn(seat) {
     this.phase = `${seat.name} konuşuyor`;
-    const listeners = this.seats.filter((s) => s !== seat && this.usable(s) && (s.listenFails || 0) < 2 && this.delta(s).items.length > 0);
-    const lp = listeners.map((s) => this.listen(s));
-    const r = await this.speak(seat);
-    const waitFor = () => listeners.filter((s) => s.status === 'listening').map((s) => s.name);
-    if (waitFor().length) {
-      this.phase = `Dinleyenler bekleniyor: ${waitFor().join(', ')}`;
-      this.changed();
-      const iv = setInterval(() => {
-        const w = waitFor();
-        if (w.length) { this.phase = `Dinleyenler bekleniyor: ${w.join(', ')}`; this.changed(); }
-      }, 3000);
-      try { await Promise.all(lp); } finally { clearInterval(iv); }
-    } else {
-      await Promise.all(lp);
-    }
-    return r;
+    return this.speak(seat);
   }
 
   async runRound() {
