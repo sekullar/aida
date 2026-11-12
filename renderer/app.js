@@ -12,7 +12,8 @@ const AI_META = {
 const $ = (id) => document.getElementById(id);
 let S = null;
 let settingsOpen = false;
-let lastFeedKey = '';
+let feedIds = [];
+let feedResetPending = false;
 
 const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const statusLabel = (s) => {
@@ -37,7 +38,7 @@ function layout() {
   table.style.width = d + 'px';
   table.style.height = d + 'px';
   const cx = st.width / 2, cy = st.height * 0.44;
-  const seats = [...document.querySelectorAll('.seat')];
+  const seats = [...document.querySelectorAll('.seat:not(.seat-exit)')];
   const n = seats.length;
   $('seats').classList.toggle('compact', n > 4);
   const rx = Math.max(0, Math.min(d / 2 + (n > 4 ? 49 : 58), st.width / 2 - 48));
@@ -48,29 +49,68 @@ function layout() {
     el.style.left = cx + rx * Math.cos(a) + 'px';
     el.style.top = cy + ry * Math.sin(a) + 'px';
   });
+  // Konuşan koltuktan masa merkezine akan ışık hattı
+  let beam = document.getElementById('beam');
+  if (!beam) { beam = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); beam.id = 'beam'; beam.setAttribute('aria-hidden', 'true'); $('stage').insertBefore(beam, $('seats')); }
+  const lines = seats.filter((x) => x.classList.contains('thinking')).map((el) => {
+    const sx = parseFloat(el.style.left), sy = parseFloat(el.style.top);
+    const dx = cx - sx, dy = cy - sy, len = Math.hypot(dx, dy) || 1;
+    const ux = dx / len, uy = dy / len;
+    return [sx + ux * 36, sy + uy * 36, cx - ux * (d * 0.2), cy - uy * (d * 0.2)].map((v) => Math.round(v));
+  });
+  const sig = JSON.stringify(lines);
+  if (beam.dataset.sig !== sig) { // aynıysa dokunma: akış animasyonu baştan başlamasın
+    beam.dataset.sig = sig; beam.innerHTML = '';
+    for (const [x1, y1, x2, y2] of lines) {
+      const ln = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      ln.setAttribute('x1', x1); ln.setAttribute('y1', y1); ln.setAttribute('x2', x2); ln.setAttribute('y2', y2);
+      beam.appendChild(ln);
+    }
+  }
 }
 
 function renderSeats() {
   const host = $('seats');
   const invited = S.seats.filter((s) => s.invited);
-  host.innerHTML = '';
+  const wanted = new Set(invited.map((s) => s.id));
+  for (const old of [...host.querySelectorAll('.seat:not(.seat-exit)')]) {
+    if (!wanted.has(old.dataset.id)) {
+      old.classList.add('seat-exit');
+      old.addEventListener('animationend', (event) => { if (event.target === old) old.remove(); }, { once: true });
+      setTimeout(() => old.remove(), 700);
+    }
+  }
   for (const s of invited) {
     const bad = s.conn !== 'ready';
-    const el = document.createElement('div');
-    el.className = `seat ${bad ? 'bad' : s.status}`;
-    el.dataset.id = s.id;
-    el.innerHTML = `<div class="avatar ${AI_META[s.id].cls}">${AI_META[s.id].svg}</div><div class="name">${esc(s.name)}</div><div class="chip">${esc(statusLabel(s))}</div>`;
-    if (s.status === 'limit' || s.status === 'error') el.querySelector('.chip').onclick = () => window.aida.resetSeat(s.id);
-    host.appendChild(el);
+    let el = [...host.children].find((node) => node.dataset.id === s.id && !node.classList.contains('seat-exit'));
+    if (!el) {
+      el = document.createElement('div');
+      el.className = 'seat seat-enter';
+      el.dataset.id = s.id;
+      el.innerHTML = `<div class="seat-inner"><div class="avatar ${AI_META[s.id].cls}">${AI_META[s.id].svg}</div><div class="name"></div><div class="chip"></div></div>`;
+      host.appendChild(el);
+      el.addEventListener('animationend', () => el.classList.remove('seat-enter'), { once: true });
+    }
+    el.className = `seat ${bad ? 'bad' : s.status}${el.classList.contains('seat-enter') ? ' seat-enter' : ''}`;
+    el.querySelector('.name').textContent = s.name;
+    const chip = el.querySelector('.chip');
+    chip.textContent = statusLabel(s);
+    chip.onclick = (s.status === 'limit' || s.status === 'error') ? () => window.aida.resetSeat(s.id) : null;
   }
   layout();
 }
 
 function renderCenter() {
   const c = $('center');
+  const update = (html) => {
+    if (c.innerHTML === html) return;
+    c.classList.add('center-swap');
+    c.innerHTML = html;
+    requestAnimationFrame(() => c.classList.remove('center-swap'));
+  };
   const invited = S.seats.filter((s) => s.invited);
   if (!invited.length) {
-    c.innerHTML = '<img class="tc-logo" src="../assets/logo.svg" alt=""><div class="tc-title">AIDA</div><div class="tc-hint">Masa boş. Sağ üstteki ayarlardan yapay zeka davet et.</div>';
+    update('<img class="tc-logo" src="../assets/logo.svg" alt=""><div class="tc-title">AIDA</div><div class="tc-hint">Masa boş. Sağ üstteki ayarlardan yapay zeka davet et.</div>');
     return;
   }
   const ready = invited.filter((s) => s.conn === 'ready' && s.status !== 'limit' && s.status !== 'error').length;
@@ -82,18 +122,20 @@ function renderCenter() {
   else if (S.running) main = '<span class="dots">Masa çalışıyor</span>';
   else if (!ready) main = '<span class="tc-hint">Katılımcıların hazır olmasını bekliyor…</span>';
   else main = `<span class="tc-hint">Bir mesaj yaz, sıra ${esc(invited.map((s) => s.name).join(' → '))} olarak döner.</span>`;
-  c.innerHTML = `<div class="tc-title">${S.auto ? 'OTOPİLOT' : 'YUVARLAK MASA'}</div><div class="tc-main">${main}</div>`;
+  update(`<div class="tc-title">${S.auto ? 'OTOPİLOT' : 'YUVARLAK MASA'}</div><div class="tc-main">${main}</div>`);
 }
 
 function renderFeed() {
-  const last = S.transcript[S.transcript.length - 1];
-  const key = S.transcript.length + ':' + (last ? last.id : 0);
-  if (key === lastFeedKey) return;
-  lastFeedKey = key;
   const feed = $('feed');
+  const entries = S.transcript || [];
+  const ids = entries.map((e, i) => String(e.id == null ? `${e.kind || 'msg'}:${e.ts || ''}:${i}` : e.id));
+  const reset = feedResetPending || ids.length < feedIds.length || ids.some((id, i) => i < feedIds.length && id !== feedIds[i]);
+  if (!reset && ids.length === feedIds.length) return;
   const nearBottom = feed.scrollHeight - feed.scrollTop - feed.clientHeight < 80;
-  feed.innerHTML = '';
-  for (const e of S.transcript) {
+  const start = reset ? 0 : feedIds.length;
+  if (reset) feed.innerHTML = '';
+  for (let i = start; i < entries.length; i++) {
+    const e = entries[i];
     const div = document.createElement('div');
     if (e.kind === 'system') {
       div.className = 'sys' + (e.deliver ? ' warn' : '');
@@ -105,8 +147,12 @@ function renderFeed() {
       const mini = isUser ? 'mini user' : `mini ${AI_META[e.from] ? AI_META[e.from].cls : ''}`;
       div.innerHTML = `<div class="${mini}"></div><div class="body"><div class="who">${esc(name)}${e.ts ? ` <time>${esc(new Date(e.ts).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }))}</time>` : ''}</div><div class="txt">${esc(e.kind === 'pass' ? 'pas geçti (-muted-)' : e.text)}</div></div>`;
     }
+    div.dataset.entryId = ids[i];
+    div.classList.add('feed-enter');
     feed.appendChild(div);
   }
+  feedIds = ids;
+  feedResetPending = false;
   if (nearBottom) feed.scrollTop = feed.scrollHeight;
 }
 
@@ -212,7 +258,7 @@ $('btnSave').onclick = async () => {
 $('btnSend').onclick = send;
 $('updChip').onclick = () => window.aida.openUpdate();
 $('btnStop').onclick = () => window.aida.stop();
-$('btnNew').onclick = () => { if (confirm('Konuşma silinsin ve AI sekmeleri yeni sohbetle yeniden açılsın mı?')) window.aida.newSession(); };
+$('btnNew').onclick = () => { if (confirm('Konuşma silinsin ve AI sekmeleri yeni sohbetle yeniden açılsın mı?')) { feedResetPending = true; feedIds = []; window.aida.newSession(); } };
 $('auto').onchange = (e) => window.aida.setAuto(e.target.checked);
 $('input').addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing && e.keyCode !== 229) { e.preventDefault(); send(); } });
 const resizeInput = () => { const input = $('input'); input.style.height = 'auto'; input.style.height = Math.min(input.scrollHeight, 150) + 'px'; };
@@ -233,6 +279,13 @@ let initialTheme = matchMedia('(prefers-color-scheme: light)').matches ? 'light'
 try { const savedTheme = localStorage.getItem('aida-theme'); if (savedTheme === 'light' || savedTheme === 'dark') initialTheme = savedTheme; } catch (_) {}
 setTheme(initialTheme, false);
 window.addEventListener('resize', layout);
+$('seats').addEventListener('pointermove', (e) => {
+  const seat = e.target.closest('.seat');
+  if (!seat) return;
+  const r = seat.querySelector('.avatar').getBoundingClientRect();
+  seat.style.setProperty('--mx', `${Math.max(0, Math.min(100, (e.clientX - r.left) / r.width * 100))}%`);
+  seat.style.setProperty('--my', `${Math.max(0, Math.min(100, (e.clientY - r.top) / r.height * 100))}%`);
+});
 
 window.aida.onState((s) => { S = s; render(); });
 window.aida.state().then((s) => { S = s; render(); });

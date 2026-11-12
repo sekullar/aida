@@ -13,6 +13,7 @@
     <button id="updChip" class="ext-chip upd" hidden></button>
     <span id="extChip" class="ext-chip off">Uzantı bağlı değil</span>
     <button id="btnNew" class="ghost" title="Tüm sohbetleri sıfırla">Yeni oturum</button>
+    <button id="btnFx" class="icon fx-toggle" title="Animasyonları kapat" aria-label="Animasyonları kapat" aria-pressed="true">✧</button>
     <button id="btnTheme" class="icon" title="Açık temaya geç" aria-label="Açık temaya geç" aria-pressed="false">
       <svg id="themeIcon" viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.93 4.93l1.42 1.42m11.3 11.3 1.42 1.42M2 12h2m16 0h2M4.93 19.07l1.42-1.42m11.3-11.3 1.42-1.42"/></svg>
     </button>
@@ -24,6 +25,7 @@
 
 <main>
   <section class="stage" id="stage">
+    <canvas id="fxCanvas" aria-hidden="true"></canvas>
     <div class="table" id="table">
       <div class="table-center" id="center"></div>
     </div>
@@ -70,6 +72,7 @@
   </div>
 </div>
 
+<script src="fx.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
