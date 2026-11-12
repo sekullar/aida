@@ -15,6 +15,14 @@ const AIS = [
 const DEFAULT_SETTINGS = { maxWords: 200, timeoutSec: 600, maxRounds: 0, saveTranscript: false };
 
 const END_TAG = /\s*\[\[\s*B[İI]T[İI]R\s*\]\]\s*/gi;
+// Her turda koltuğa farklı bir bakış açısı verilir; herkesin aynı fikre yaslanmasını engeller
+const LENSES = [
+  'ŞÜPHECİ: şimdiye kadar söylenenlerde en zayıf, kanıtsız ya da varsayıma dayanan iddiayı bul ve çürütmeye çalış.',
+  'RİSK AVCISI: masadaki fikir hayata geçerse nasıl başarısız olur? Somut bir başarısızlık senaryosu (pre-mortem) anlat.',
+  'ALTERNATİFÇİ: masada hiç konuşulmamış farklı bir yaklaşım, çerçeve ya da seçenek getir; mevcut yolun neden seçilmesi gerektiğini sorgula.',
+  'KANITÇI: iddiaları rakam, örnek, karşı örnek ya da doğrulanabilir bilgiyle sına; neyin bilgi, neyin varsayım olduğunu ayır.',
+  'HAKEM: masadaki çelişkileri say, hangi tarafın daha güçlü olduğuna gerekçeyle karar ver; "ikisi de haklı" kaçamağına başvurma.',
+];
 const isMuted = (t) => /^[\W_]*muted[\W_]*$/i.test(String(t || '').trim());
 
 const ERR_TEXT = {
@@ -190,7 +198,7 @@ class Engine extends EventEmitter {
     if (!s || s.invited) return { ok: false, error: 'already' };
     if (!this.bridge.connected()) return { ok: false, error: 'no-extension' };
     s.invited = true; s.conn = 'opening'; s.status = 'idle'; s.note = 'Sekme açılıyor';
-    s.seen = 0; s.intro = false; s.fails = 0; s.listenFails = 0;
+    s.seen = 0; s.intro = false; s.fails = 0; s.listenFails = 0; s.turns = 0;
     this.bridge.send({ type: 'open', ai: s.id, url: s.url, bounds: this.getBounds ? this.getBounds(s.id, this.seats.filter((x) => x.invited).indexOf(s)) : undefined });
     this.addSystem(`${s.name} masaya davet edildi.`);
     this.changed();
@@ -219,7 +227,7 @@ class Engine extends EventEmitter {
     this.round = 0;
     this.phase = '';
     for (const s of this.seats) {
-      s.seen = 0; s.intro = false; s.fails = 0; s.listenFails = 0; s.status = 'idle'; s.note = '';
+      s.seen = 0; s.intro = false; s.fails = 0; s.listenFails = 0; s.turns = 0; s.status = 'idle'; s.note = '';
       if (s.invited) { s.conn = 'opening'; s.note = 'Yeni sohbet açılıyor'; this.bridge.send({ type: 'open', ai: s.id, url: s.url, bounds: this.getBounds ? this.getBounds(s.id, this.seats.filter((x) => x.invited).indexOf(s)) : undefined }); }
     }
     this.changed();
@@ -246,10 +254,13 @@ class Engine extends EventEmitter {
       'KURALLAR:',
       '1) Her mesajım "[AIDA]" ile başlar ve masada konuşulanları "Kullanıcı:", "ChatGPT:" gibi etiketlerle aktarır.',
       '2) Mesajın sonunda "SIRA: SENDE" yazar; o zaman cevap ver. Mesaj, son konuşmandan beri masada geçenlerin hepsini tek seferde içerir.',
-      `3) Sıran geldiğinde kısa ve öz yaz (en fazla yaklaşık ${this.settings.maxWords} kelime). Diğerlerinin fikirlerine atıf yapabilir, katılabilir ya da gerekçeyle itiraz edebilirsin. Cevabına kendi adını etiket olarak yazma.`,
-      '4) Eklemek istediğin yeni bir şey yoksa sıran gelse bile sadece -muted- yaz.',
-      '5) Otopilot modunda kullanıcı araya girmez, tartışma sürer. Konunun tükendiğini ve sohbeti bitirmek istediğini düşünürsen cevabının en sonuna [[BITIR]] ekle. Herkes bitirmek isterse sohbet kapanır.',
-      '6) İnternette arama, dosya/görsel oluşturma gibi araçları kullanma; sadece metinle cevap ver. Kullanıcı hangi dilde yazarsa o dilde cevap ver.',
+      `3) Sıran geldiğinde kısa ve öz yaz (en fazla yaklaşık ${this.settings.maxWords} kelime). Cevabına kendi adını etiket olarak yazma.`,
+      '4) OBJEKTİF VE KESKİN OL. Amaç masayı memnun etmek değil, doğruya yaklaşmak. Övgü, nezaket dolgusu ve "harika fikir" tarzı cümleler yasak. Kullanıcının ve diğer yapay zekaların iddialarına, hatalıysa ya da zayıfsa, açıkça ve gerekçeyle itiraz et; kullanıcıya da.',
+      '5) Herkes aynı fikirdeyse bunu bir uyarı say: ortak yanılgı, eksik bakış ya da gözden kaçan risk olabilir; onu ara. Çoğunluk öyle diyor diye fikrini değiştirme; yalnızca yeni bir argüman ya da kanıt görürsen değiştir ve neyin seni ikna ettiğini söyle. Katılıyorsan tek cümleyle de, mutlaka yeni bir şey ekleyerek katıl (başkasını tekrar etme).',
+      '6) Bilmediğin ya da emin olmadığın şeyi uydurma; belirsizliği açıkça belirt. Önemli bir sonuca vardıysan cevabın sonuna "Güven: %X" ekle.',
+      '7) Her turda sana bir BAKIŞ AÇISI verilir; cevabını o açıdan kur, ama doğru olmadığını düşündüğün bir şeyi savunmak zorunda değilsin. Eklemek istediğin yeni bir şey yoksa sadece -muted- yaz.',
+      '8) Otopilot modunda kullanıcı araya girmez, tartışma sürer. Konunun tükendiğini ve sohbeti bitirmek istediğini düşünürsen cevabının en sonuna [[BITIR]] ekle. Herkes bitirmek isterse sohbet kapanır.',
+      '9) İnternette arama, dosya/görsel oluşturma gibi araçları kullanma; sadece metinle cevap ver. Kullanıcı hangi dilde yazarsa o dilde cevap ver.',
     ].join('\n');
   }
 
@@ -261,8 +272,10 @@ class Engine extends EventEmitter {
     const parts = ['[AIDA]'];
     if (!seat.intro) parts.unshift(this.introText(seat), '');
     parts.push('Masada yeni konuşulanlar:', '---', items.length ? this.renderItems(items) : '(yeni bir şey söylenmedi)', '---');
+    const idx = Math.max(0, this.seats.filter((s) => s.invited).indexOf(seat));
+    parts.push(`BU TURDAKİ BAKIŞ AÇIN — ${LENSES[(idx + (seat.turns || 0)) % LENSES.length]}`);
     if (this.auto) {
-      parts.push('MOD: OTOPİLOT. Kullanıcı araya girmiyor; diğerleriyle tartışmayı sürdür. Katılıyorsan söyle, katılmıyorsan gerekçeyle itiraz et. Konu tükendiyse ve hemfikirseniz cevabının sonuna [[BITIR]] ekle.');
+      parts.push('MOD: OTOPİLOT. Kullanıcı araya girmiyor. Tartışmayı sürdür ama dolaşma: yeni bir argüman, kanıt ya da itirazın yoksa -muted- yaz. Konu gerçekten tükendiyse ve gerekçeli bir ortak sonuca vardıysanız cevabının sonuna [[BITIR]] ekle; sırf nezaketle bitirme.');
     }
     parts.push(`SIRA: SENDE — ${seat.name}, cevap ver. (Eklenecek bir şey yoksa sadece -muted- yaz.)`);
     return parts.join('\n');
@@ -331,7 +344,7 @@ class Engine extends EventEmitter {
       this.changed();
       return { spoke: false };
     }
-    seat.seen = upto; seat.intro = true; seat.fails = 0;
+    seat.seen = upto; seat.intro = true; seat.fails = 0; seat.turns = (seat.turns || 0) + 1;
     // Bazı modeller (Gemini) istemdeki "[AIDA]" başlığını cevabın başına kopyalıyor
     res.text = String(res.text || '').replace(/^\s*\[AIDA\]\s*/i, '');
     if (isMuted(res.text)) {

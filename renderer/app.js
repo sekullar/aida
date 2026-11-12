@@ -32,20 +32,21 @@ const statusLabel = (s) => {
 
 function layout() {
   const st = $('stage').getBoundingClientRect();
-  const d = Math.max(240, Math.min(st.width * 0.56, st.height * 0.6));
+  const d = Math.max(180, Math.min(st.width * 0.48, st.height * 0.55));
   const table = $('table');
   table.style.width = d + 'px';
   table.style.height = d + 'px';
-  const cx = st.width / 2, cy = st.height * 0.46, R = d / 2 + 40;
+  const cx = st.width / 2, cy = st.height * 0.44;
   const seats = [...document.querySelectorAll('.seat')];
   const n = seats.length;
   $('seats').classList.toggle('compact', n > 4);
-  const spread = n <= 4 ? 150 : 220; // kalabalık masada yay aşağı doğru genişler ("Sen" altta kalır)
+  const rx = Math.max(0, Math.min(d / 2 + (n > 4 ? 49 : 58), st.width / 2 - 48));
+  const ry = Math.max(0, Math.min(d / 2 + 47, cy - 52, st.height - cy - 74));
   seats.forEach((el, i) => {
-    const deg = n === 1 ? -90 : -90 - spread / 2 + (spread * i) / (n - 1);
+    const deg = n === 1 ? -90 : -90 + (360 * i) / n;
     const a = (deg * Math.PI) / 180;
-    el.style.left = cx + R * Math.cos(a) + 'px';
-    el.style.top = cy + R * Math.sin(a) * 0.92 + 'px';
+    el.style.left = cx + rx * Math.cos(a) + 'px';
+    el.style.top = cy + ry * Math.sin(a) + 'px';
   });
 }
 
@@ -102,7 +103,7 @@ function renderFeed() {
       const name = isUser ? 'Sen' : (S.seats.find((s) => s.id === e.from) || {}).name || e.from;
       div.className = 'msg' + (e.kind === 'pass' ? ' pass' : '');
       const mini = isUser ? 'mini user' : `mini ${AI_META[e.from] ? AI_META[e.from].cls : ''}`;
-      div.innerHTML = `<div class="${mini}"></div><div class="body"><div class="who">${esc(name)}</div><div class="txt">${esc(e.kind === 'pass' ? 'pas geçti (-muted-)' : e.text)}</div></div>`;
+      div.innerHTML = `<div class="${mini}"></div><div class="body"><div class="who">${esc(name)}${e.ts ? ` <time>${esc(new Date(e.ts).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }))}</time>` : ''}</div><div class="txt">${esc(e.kind === 'pass' ? 'pas geçti (-muted-)' : e.text)}</div></div>`;
     }
     feed.appendChild(div);
   }
@@ -131,6 +132,9 @@ function renderControls() {
 function renderSettings() {
   if (!settingsOpen) return;
   const list = $('inviteList');
+  const sig = JSON.stringify(S.seats.map((s) => [s.id, s.invited, statusLabel(s)]));
+  if (list.dataset.sig !== sig) {
+  list.dataset.sig = sig;
   list.innerHTML = '';
   for (const s of S.seats) {
     const row = document.createElement('div');
@@ -148,6 +152,7 @@ function renderSettings() {
     };
     row.appendChild(btn);
     list.appendChild(row);
+  }
   }
   const box = $('extBox');
   $('verInfo').textContent = `AIDA v${S.appVersion || '?'} · Uzantı ${S.extVersion ? extVerText() : '—'}`;
@@ -190,11 +195,15 @@ function openSettings() {
   $('setRounds').value = S.settings.maxRounds;
   $('setSave').checked = !!S.settings.saveTranscript;
   $('modal').hidden = false;
+  $('inviteList').dataset.sig = '';
   renderSettings();
+  $('btnClose').focus();
 }
 
 $('btnSettings').onclick = openSettings;
-$('btnClose').onclick = () => { settingsOpen = false; $('modal').hidden = true; };
+$('btnTheme').onclick = () => setTheme(document.documentElement.dataset.theme === 'light' ? 'dark' : 'light', true);
+$('btnClose').onclick = () => { settingsOpen = false; $('modal').hidden = true; $('btnSettings').focus(); };
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && settingsOpen) $('btnClose').click(); });
 $('modal').onclick = (e) => { if (e.target === $('modal')) $('btnClose').click(); };
 $('btnSave').onclick = async () => {
   await window.aida.saveSettings({ maxWords: $('setWords').value, timeoutSec: $('setTimeout').value, maxRounds: $('setRounds').value, saveTranscript: $('setSave').checked });
@@ -205,7 +214,24 @@ $('updChip').onclick = () => window.aida.openUpdate();
 $('btnStop').onclick = () => window.aida.stop();
 $('btnNew').onclick = () => { if (confirm('Konuşma silinsin ve AI sekmeleri yeni sohbetle yeniden açılsın mı?')) window.aida.newSession(); };
 $('auto').onchange = (e) => window.aida.setAuto(e.target.checked);
-$('input').addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } });
+$('input').addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing && e.keyCode !== 229) { e.preventDefault(); send(); } });
+const resizeInput = () => { const input = $('input'); input.style.height = 'auto'; input.style.height = Math.min(input.scrollHeight, 150) + 'px'; };
+$('input').addEventListener('input', resizeInput);
+function setTheme(theme, persist) {
+  document.documentElement.dataset.theme = theme;
+  const button = $('btnTheme');
+  const next = theme === 'light' ? 'koyu' : 'açık';
+  button.title = `${next[0].toLocaleUpperCase('tr-TR')}${next.slice(1)} temaya geç`;
+  button.setAttribute('aria-label', button.title);
+  button.setAttribute('aria-pressed', String(theme === 'light'));
+  $('themeIcon').innerHTML = theme === 'light'
+    ? '<path d="M20.5 15.5A8.5 8.5 0 0 1 8.5 3.5 8.5 8.5 0 1 0 20.5 15.5Z"/>'
+    : '<circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.93 4.93l1.42 1.42m11.3 11.3 1.42 1.42M2 12h2m16 0h2M4.93 19.07l1.42-1.42m11.3-11.3 1.42-1.42"/>';
+  if (persist) { try { localStorage.setItem('aida-theme', theme); } catch (_) {} }
+}
+let initialTheme = matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+try { const savedTheme = localStorage.getItem('aida-theme'); if (savedTheme === 'light' || savedTheme === 'dark') initialTheme = savedTheme; } catch (_) {}
+setTheme(initialTheme, false);
 window.addEventListener('resize', layout);
 
 window.aida.onState((s) => { S = s; render(); });

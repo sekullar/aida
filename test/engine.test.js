@@ -47,6 +47,9 @@ async function setup(script) {
     assert.strictEqual(asks.length, 3, 'her yapay zekaya yalnızca kendi sırasında 1 mesaj');
     const turn3 = asks.find((m) => m.ai === 'claude');
     assert(turn3.text.includes('Kullanıcı: Merhaba masa') && turn3.text.includes('ChatGPT: chatgpt cevabı') && turn3.text.includes('Gemini: gemini cevabı'), 'Claude öncekilerin hepsini tek mesajda almalı');
+    const lens = asks.map((m) => (m.text.match(/BAKIŞ AÇIN — ([A-ZÇĞİÖŞÜ ]+):/) || [])[1]);
+    assert(lens.every(Boolean) && new Set(lens).size === 3, 'her koltuğa farklı bakış açısı verilmeli: ' + lens);
+    assert(asks[0].text.includes('OBJEKTİF VE KESKİN OL'), 'ilk mesaj keskinlik kuralını içermeli');
     console.log('ok 1: manuel tur sırası, geçmiş tek mesajda');
   }
   // 2) Limit: Gemini limit dolunca pas geçilir ve tespit edilir

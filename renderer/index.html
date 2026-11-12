@@ -13,8 +13,11 @@
     <button id="updChip" class="ext-chip upd" hidden></button>
     <span id="extChip" class="ext-chip off">Uzantı bağlı değil</span>
     <button id="btnNew" class="ghost" title="Tüm sohbetleri sıfırla">Yeni oturum</button>
+    <button id="btnTheme" class="icon" title="Açık temaya geç" aria-label="Açık temaya geç" aria-pressed="false">
+      <svg id="themeIcon" viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.93 4.93l1.42 1.42m11.3 11.3 1.42 1.42M2 12h2m16 0h2M4.93 19.07l1.42-1.42m11.3-11.3 1.42-1.42"/></svg>
+    </button>
     <button id="btnSettings" class="icon" title="Ayarlar" aria-label="Ayarlar">
-      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.8v2.4M12 18.8v2.4M2.8 12h2.4M18.8 12h2.4M5.5 5.5l1.7 1.7M16.8 16.8l1.7 1.7M5.5 18.5l1.7-1.7M16.8 7.2l1.7-1.7"/></svg>
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1"/><circle cx="15" cy="6" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="17" cy="18" r="2"/></svg>
     </button>
   </div>
 </header>
@@ -35,10 +38,10 @@
 
 <footer>
   <div class="composer">
-    <textarea id="input" rows="2" placeholder="Masaya bir mesaj yaz… (Enter gönderir, Shift+Enter yeni satır)"></textarea>
+    <textarea id="input" rows="2" aria-label="Masaya mesaj yaz" placeholder="Masaya bir mesaj yaz… (Enter gönderir, Shift+Enter yeni satır)"></textarea>
     <div class="actions">
       <label class="switch" title="Durdurulana kadar yapay zekalar kendi aralarında konuşur">
-        <input type="checkbox" id="auto"><span class="track"><span class="thumb"></span></span><span class="sw-label">Otopilot</span>
+        <input type="checkbox" id="auto" aria-label="Otopilot"><span class="track"><span class="thumb"></span></span><span class="sw-label">Otopilot</span>
       </label>
       <button id="btnStop" class="danger" hidden>Durdur</button>
       <button id="btnSend" class="primary">Gönder</button>
